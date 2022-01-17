@@ -1,0 +1,531 @@
+import pygame
+import random
+from pygame.locals import *
+pygame.mixer.init()
+pygame.init()
+screen_width = 1268
+screen_height = 700
+screen = pygame.display.set_mode((screen_width, screen_height))
+clock = pygame.time.Clock()
+fps = 70
+#define font
+font = pygame.font.SysFont('font1.TTF', 60)
+
+#xác d?nh màu s?c
+white = (255, 255, 255)
+colorscore = (0,0,139)
+green = (100,255,100)
+brightblue = (47,228,253)
+orange = (255,113,0)
+yellow = (255,236,0)
+purple = (252,67,255)
+camnau = (184,134,11) 
+
+#thêm ?nh
+img_title = pygame.image.load('./img/tengame.png')
+img_title = pygame.transform.scale2x(img_title)
+    # Thông s? n?n trò choi
+img_bg = pygame.image.load('./img/bg3.png')
+bg = pygame.image.load('./img/laudaitinhai.png')
+# ----- K?t tget_pressedhúc và b?t d?u -------
+begin = pygame.image.load('./img/start.png')
+begin = pygame.transform.scale2x(begin)
+huongdanchoi = pygame.image.load("./img/huongdan.png")
+over = pygame.image.load('./img/over.png')
+ready = pygame.image.load('./img/ready.png')
+ready= pygame.transform.scale2x(ready)
+button_img = pygame.image.load('./img/restart.png')
+button_img = pygame.transform.scale2x(button_img)
+
+
+bg_start = 0
+bg_speed = 1
+i = 0
+flying = False
+
+
+ground_scroll = 0
+scroll_speed = 4
+pipe_gap = 150
+pipe_frequency = 1500 #milliseconds
+khoitren_frequency = 1500
+
+last_pipe = pygame.time.get_ticks() - pipe_frequency
+score = 0
+pass_pipe = False
+
+#==============================================================================================
+#'state':True,
+begin_button = {
+    "again":False,
+    
+    'px':400,
+    'py':450,
+    'width':begin.get_rect().width,
+    'height':begin.get_rect().height
+}
+huongdan_button ={
+    "again":False,
+    'state':True,
+    'px':400,
+    'py':450,
+    'width':huongdanchoi.get_rect().width,
+    'height':huongdanchoi.get_rect().height
+}
+# T?c d? b?t d?u
+start_speed = -3
+# Thông s? chu?n b? cho trò choi
+game_run = {
+    'isOver': False,
+    'begin': False,
+    'huongdanchoi' :False
+}
+
+
+# function xu?t van b?n ra màn hình
+def draw_text(text, font, text_col, x, y):
+    img = font.render(text, True, text_col)
+    screen.blit(img, (x, y))
+
+def reset_game():
+    pipe_group.empty()
+    flappy.rect.x = 100
+    flappy.rect.y = int(screen_height / 2)
+    score = 0
+    return score
+
+
+
+
+#========================================================================================================
+class Mage(pygame.sprite.Sprite):
+
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.images = []
+        self.index = 0
+        self.counter = 0
+        for num in range (1, 4):
+            img = pygame.image.load(f"img/bird{num}.png")
+            self.images.append(img)
+        self.image = self.images[self.index]
+        self.rect = self.image.get_rect()
+        self.rect.center = [x, y]
+        self.vel = 0
+        self.clicked = False
+
+    def update(self):
+
+        if flying == True:
+            #apply gravity
+            self.vel += 0.5
+            if self.vel > 8:
+                self.vel = 8
+            if self.rect.bottom < 768:
+                self.rect.y += int(self.vel)
+
+        if game_run['isOver'] == False:
+            #jump
+            if pygame.mouse.get_pressed()[0] == 1 and self.clicked == False:
+                self.clicked = False
+                self.vel = -8
+            if pygame.mouse.get_pressed()[0] == 0:
+                self.clicked = False
+
+            #handle the animation
+            flap_cooldown = 5
+            self.counter += 1
+            
+            if self.counter > flap_cooldown:
+                self.counter = 0
+                self.index += 1
+                if self.index >= len(self.images):
+                    self.index = 0
+                self.image = self.images[self.index]
+
+
+            #rotate the bird # ham nghieng
+            self.image = pygame.transform.rotate(self.images[self.index], self.vel * -2)
+        else:
+            #point the bird at the ground
+            self.image = pygame.transform.rotate(self.images[self.index], -90)
+#----------------------------------------------------------------------------------------------
+
+class Pipe(pygame.sprite.Sprite):
+
+    def __init__(self, x, y, position):
+        pygame.sprite.Sprite.__init__(self)
+        self.images = []
+        self.index = 0
+        self.counter = 0
+        #self.image = pygame.image.load("img/pipe.png")
+        for num in range (1, 3):
+            img = pygame.image.load(f"./img/cot{num}.png")
+            self.images.append(img)
+        self.image = self.images[self.index]
+        self.rect = self.image.get_rect()
+        #position variable determines if the pipe is coming from the bottom or top
+        #position 1 is from the top, -1 is from the bottom
+        if position == 1:
+            self.image = pygame.transform.flip(self.image, False, True)
+            self.rect.bottomleft = [x, y - int(pipe_gap / 2)]
+        elif position == -1:
+            self.image = pygame.transform.flip(self.image, False, True)
+            self.rect.topleft = [x, y + int(pipe_gap / 2)]
+
+
+    def update(self):
+        flap_cooldown = 5
+        self.counter += 1
+        
+        if self.counter > flap_cooldown:
+            self.counter = 0
+            self.index += 1
+            if self.index >= len(self.images):
+                self.index = 0
+            self.image = self.images[self.index]
+
+
+            
+        self.rect.x -= scroll_speed
+        if self.rect.right < 0:
+            self.kill()
+
+
+
+#===========================================================================================
+class khoitren(pygame.sprite.Sprite):
+
+    def __init__(self, x, y, position):
+        pygame.sprite.Sprite.__init__(self)
+        self.images = []
+        self.index = 0
+        self.counter = 0
+        #self.image = pygame.image.load("img/pipe.png")
+        for num in range (1, 3):
+            img = pygame.image.load(f"./img/cot{num}.png")
+            self.images.append(img)
+        self.image = self.images[self.index]
+        self.rect = self.image.get_rect()
+        #position variable determines if the pipe is coming from the bottom or top
+
+    # bi?n v? trí xác d?nh xem du?ng ?ng d?n t? du?i cùng hay trên cùng
+        #position 1 is from the top, -1 is from the bottom
+        #if position == 1:
+            #self.image = pygame.transform.flip(self.image, False, True)
+        #    self.rect.bottomleft = [x, y - int(pipe_gap / 2)]
+        #elif position == -1:
+        #   self.rect.topleft = [x, y + int(pipe_gap / 2)]
+
+
+    def update(self):
+        flap_cooldown = 5
+        self.counter += 1
+        
+        if self.counter > flap_cooldown:
+            self.counter = 0
+            self.index += 1
+            if self.index >= len(self.images):
+                self.index = 0
+            self.image = self.images[self.index]
+
+
+            
+        self.rect.x -= scroll_speed
+        if self.rect.right < 0:
+            self.kill()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#=====================================================================================================
+
+
+
+
+
+#t?o button reset
+class Button():
+    def __init__(self, x, y, image):
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+
+    def draw(self):
+        action = False
+
+        #get mouse position
+        pos = pygame.mouse.get_pos()
+
+        #check mouseover and clicked conditions
+        if self.rect.collidepoint(pos):
+            if pygame.mouse.get_pressed()[0] == 1:
+                action = True
+
+        #draw button
+        screen.blit(self.image, (self.rect.x, self.rect.y))
+
+        return action
+
+
+
+
+#==============================================================================================
+
+
+
+# Kh?i t?o
+
+def game_init():
+    #screen.blit(bg, (bg_start, 0))
+    #screen.blit(img_bg, (0,0))
+    bg_start = 0
+    screen.blit(img_bg, (bg_start, 0))
+    screen.blit(img_bg, (screen_width+bg_start, 0))
+    if bg_start == -screen_width:
+        screen.blit(img_bg, (screen_width+bg_start, 0))
+        bg_start = 0
+    bg_start -= 1
+    game_run['begin'] = False
+    game_run['isOver'] = False
+game_init()
+
+
+
+
+
+# thi?t k? nút b?t d?u game 
+def draw_begin():
+    if game_run['begin'] is False:
+        screen.blit(ready, (460, 200))
+        begin_button['px'] = 550
+        begin_button['py'] = 300
+    else:
+        begin_button['px'] = 20
+        begin_button['py'] = screen_height - 80
+    screen.blit(begin, (begin_button['px'], begin_button['py']))
+
+
+# hu?ng d?n choi
+def draw_begin2():
+    if game_run['huongdanchoi'] is False :
+        huongdan_button['px'] = 760
+        huongdan_button['py'] = 600
+    screen.blit(huongdanchoi, (huongdan_button['px'], huongdan_button['py']))
+
+#Hoàn thành
+def draw_over():
+    screen.blit(over, (300,200))
+
+
+
+
+
+
+screen.blit(bg, (0,0))
+
+draw_begin()
+#draw_begin1()
+#draw_begin2()
+def bt_crash(mx,my):
+    if  begin_button["px"] <= mx <= (begin_button['px'] + begin_button['width']) and begin_button['py'] <= my <= (begin_button['py'] + begin_button['height']):
+            return True
+    return False
+def bt_crash2(mx,my):
+    if  begin_button["px"] <= mx <= (begin_button['px'] + begin_button['width']) and begin_button['py'] <= my <= (begin_button['py'] + begin_button['height']):
+            return True
+    return False
+
+mage_group = pygame.sprite.Group()
+
+flappy = Mage(100, int(screen_height / 2))
+mage_group.add(flappy)
+
+
+
+button = Button(screen_width // 2 -100, screen_height // 2 - 100, button_img)
+button1 = Button(screen_width // 2 -100, screen_height // 2 - 100, button_img)
+bg_start = 0
+pipe_group = pygame.sprite.Group()
+khoitren_group = pygame.sprite.Group()
+#=============================================================================================================
+#=============================================================================================================
+run = True
+while run:
+    #screen.blit(img_bg, (0,0))
+    clock.tick(fps)
+    # V? têu d?
+    
+    screen.blit(img_title, (screen_width-1250, 0))
+    #if  game_run['begin'] is True  and begin_button['state'] is True : 
+    if  game_run['begin'] is True   : 
+        
+        screen.blit(img_bg, (0,0))
+        screen.blit(img_bg, (i, 0))
+        screen.blit(img_bg, (screen_width+i, 0))
+        if i == -screen_width:
+
+            screen.blit(img_bg, (screen_width+i, 0))
+            i = 0
+        i -= 1
+        mage_group.draw(screen)
+        pipe_group.draw(screen)
+        khoitren_group.draw(screen)
+        mage_group.update()
+        #d?t thêm img_title trong khi chs
+        screen.blit(img_title, (screen_width-1250, 0))
+
+
+        #check the score
+        
+        if len(pipe_group) > 0:
+            if mage_group.sprites()[0].rect.left < pipe_group.sprites()[0].rect.left\
+                and mage_group.sprites()[0].rect.right < pipe_group.sprites()[0].rect.right\
+                and pass_pipe == False:
+                pass_pipe = True
+            if pass_pipe == True:
+                if mage_group.sprites()[0].rect.left > pipe_group.sprites()[0].rect.right:
+                    score += 1
+                    pass_pipe = False
+            draw_text(str(score), font, white, int(screen_width / 2), 20)
+
+
+
+
+# TH? t?o level mà chua dc
+        '''
+        if score >= 3  :
+            screen.blit(img_bg, (0,0))
+            draw_text("Màn 2",font,camnau,int(screen_width / 2.4),(screen_height /4))
+            game_run['isOver'] == False
+            pipe_group.empty()
+            if button1.draw() :
+                flappy.rect.x = 100
+                flappy.rect.y = int(screen_height / 2)   
+                flying == True
+                game_run['begin'] == False
+        '''           
+
+
+
+
+        #============================================================================
+        if pygame.sprite.groupcollide(mage_group, pipe_group, False, False) or flappy.rect.top < 0:
+            game_run['isOver'] = True
+
+        if flappy.rect.bottom > 768:
+            game_over = True
+            flying = False
+
+
+        if flappy.rect.bottom > 708:
+            game_run['isOver'] = True
+            flying = False
+
+        #sinh vat c?n m?i
+        if game_run['isOver'] == False and flying == True :
+        #generate new pipes
+            time_now = pygame.time.get_ticks()
+            if time_now - last_pipe > pipe_frequency:
+                pipe_height = random.randint(-130, 130)
+                
+                
+                if score < 3 :
+                    
+                    btm_pipe = Pipe(screen_width, int(screen_height / 2) + pipe_height, -1)
+                    #top_pipe = Pipe(screen_width, int(screen_height / 2) + pipe_height, 1)
+                    pipe_group.add(btm_pipe)
+                    #pipe_group.add(top_pipe)
+                    
+                
+                else :
+                    
+                    #btm_pipe = Pipe(screen_width, int(screen_height / 1.5) + pipe_height, -1)
+                    top_pipe = Pipe(screen_width, int(screen_height / 2.5) + pipe_height, 1)
+                    #pipe_group.add(btm_pipe)
+                    pipe_group.add(top_pipe)
+                last_pipe = time_now
+                
+            #draw and scroll the ground
+            '''
+            ground_scroll -= scroll_speed
+            if abs(ground_scroll) > 35:
+                ground_scroll = 0
+            '''
+            pipe_group.update()
+
+
+
+
+
+
+
+
+
+
+        # in di?m s? sau khi k?t thúc tr?n và th?c hi?n ch?c nang restart
+
+        if game_run['isOver'] == True:
+            screen.blit(img_bg, (0,0))
+            draw_text("Score : "+str(score),font,camnau,int(screen_width / 2.4),(screen_height /4))
+            
+            # d?c di?m highscore t? file log và n?u file d?y ko t?n t?i thì s? t? t?o 1 file m?i.
+            try:
+                #reading highscore
+                hscore = open ("score.log", 'r')
+                high_score = hscore.read ()
+                hscore.close ()
+            except:
+                writescore = open ("score.log", "w")
+                writescore.write (str (0))
+                writescore.close ()
+            if high_score =="" or (int(high_score) < int(score)) :
+                writescore=open("score.log","w")
+                writescore.write(str(score))
+                writescore.close()
+            draw_text("Highest point : "+str(high_score),font,camnau,int(screen_width / 2.4),(screen_height /5.5))
+            if button.draw():
+                
+                game_run['isOver'] = False
+                score = reset_game()
+
+
+    
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            run = False
+        if event.type == pygame.MOUSEBUTTONDOWN and flying == False and game_run['isOver'] == False:
+            flying = True
+            mx, my = event.pos
+            
+                
+    # Click chu?t
+    m1, m2, m3 = pygame.mouse.get_pressed()
+    mx, my = pygame.mouse.get_pos()
+    if m1:
+        # xác d?nh v? trí  begin_button d? click chu?t
+        if  bt_crash(mx,my) and  begin_button['px'] ==550:
+            game_run['begin'] = True
+        if bt_crash2(mx,my)and   huongdan_button['px'] == 760 and game_run['isOver'] is True:
+            #game_run['huongdanchoi'] = True 
+            game_run['begin'] = True
+    pygame.display.update()
+pygame.QUIT
