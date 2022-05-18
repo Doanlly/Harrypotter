@@ -1,9 +1,9 @@
 # Harrypotter
-# Game lấy cảm hứng từ tựa game huyền thoại Flappy 
+## Game lấy cảm hứng từ tựa game huyền thoại Flappy 
 # 
-# Cách cài đặt
+# Yêu cầu
   ## Yêu cầu python 3
   ## sử dụng thư viện pygame
   ### pip install pygame
   ## Khởi chạy
-  ### teminal: python file.py
+  ### teminal: python main.py
