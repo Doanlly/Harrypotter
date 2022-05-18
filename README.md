@@ -1,5 +1,5 @@
 # Harrypotter
-# Game lấy cảm hứng từ tựa game huyền thoại Flappy bird
+# Game lấy cảm hứng từ tựa game huyền thoại Flappy 
 # 
 # Cách cài đặt
   ## Yêu cầu python 3
